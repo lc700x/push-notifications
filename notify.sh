@@ -44,14 +44,15 @@ fi
 TOPIC="$(cat "$TOPIC_FILE")"
 
 # ── Build notification body ───────────────────────────────────────────────
+SKIP_PUSH=false
+
 if $DETAILS && command -v git &>/dev/null && git rev-parse --git-dir &>/dev/null 2>&1; then
   CHANGED=$(git status --short 2>/dev/null | wc -l | tr -d ' ')
   DIFF_SUMMARY=$(git diff --stat -- . 2>/dev/null | tail -1 || echo "")
   STAGED_SUMMARY=$(git diff --stat --cached -- . 2>/dev/null | tail -1 || echo "")
 
-  BODY="${LABEL} done — ${DIR}"
   if [[ "$CHANGED" -gt 0 ]]; then
-    BODY+=" | ${CHANGED} file(s) changed"
+    BODY="${LABEL} done — ${DIR} | ${CHANGED} file(s) changed"
     if [[ -n "$DIFF_SUMMARY" ]]; then
       BODY+=" (${DIFF_SUMMARY})"
     fi
@@ -59,19 +60,23 @@ if $DETAILS && command -v git &>/dev/null && git rev-parse --git-dir &>/dev/null
       BODY+=" [staged: ${STAGED_SUMMARY}]"
     fi
   else
-    BODY+=" | no file changes"
+    # No file changes — skip the push notification entirely.
+    # Local sound still plays below.
+    SKIP_PUSH=true
   fi
 else
   BODY="${LABEL} done — ${DIR}"
 fi
 
 # ── Push notification ─────────────────────────────────────────────────────
-curl -s \
-  -H "Priority: default" \
-  -H "Title: ${LABEL} done" \
-  -d "${BODY}" \
-  "ntfy.sh/${TOPIC}" \
-  > /dev/null 2>&1 &
+if ! $SKIP_PUSH; then
+  curl -s \
+    -H "Priority: default" \
+    -H "Title: ${LABEL} done" \
+    -d "${BODY}" \
+    "ntfy.sh/${TOPIC}" \
+    > /dev/null 2>&1 &
+fi
 
 # ── Local sound ───────────────────────────────────────────────────────────
 case "$OS" in
