@@ -126,7 +126,7 @@ watch_one_log() {
 
     if $fire && (( now - last_fire >= DEBOUNCE_SEC )); then
       echo "$now" > "$last_file"
-      "$NOTIFY_SCRIPT" "$label" &
+      "$NOTIFY_SCRIPT" "$label" --details &
     fi
   done
 }
