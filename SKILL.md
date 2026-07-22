@@ -1,7 +1,16 @@
 ---
 name: push-notifications
+slug: push-notifications
+displayName: Push Notifications
+version: 1.0.0
 description: Set up, toggle, and test push notifications via ntfy.sh — get iPhone/Android alerts when any coding agent finishes. Works on macOS, Linux, and Windows.
 argument-hint: "[setup|toggle|on|off|test|status|sound]"
+license: MIT
+compatibility: Requires Claude Code, GitHub Copilot CLI, or any terminal-based coding agent. Requires ntfy app on phone (free, iOS/Android). qrencode for QR setup.
+metadata:
+  author: lc700x
+  platforms: macOS, Linux, Windows
+  category: productivity
 ---
 
 # Push Notifications for Coding Agents
