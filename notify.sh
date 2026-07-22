@@ -43,6 +43,13 @@ if [[ ! -f "$TOPIC_FILE" ]]; then
 fi
 TOPIC="$(cat "$TOPIC_FILE")"
 
+# ── Trailing-edge debounce (--details mode only) ──────────────────────────
+# In --details mode, Claude fires Stop hooks on every internal turn
+# (tool calls, mid-task responses), not just when truly done.
+# This debounce ensures only the LAST event in a burst fires a push.
+DEBOUNCE_SEC=7
+MARKER_FILE="/tmp/push-notify-marker-$$"
+
 # ── Build notification body ───────────────────────────────────────────────
 SKIP_PUSH=false
 
@@ -60,22 +67,43 @@ if $DETAILS && command -v git &>/dev/null && git rev-parse --git-dir &>/dev/null
       BODY+=" [staged: ${STAGED_SUMMARY}]"
     fi
   else
-    # No file changes — skip the push notification entirely.
-    # Local sound still plays below.
+    # No file changes — skip the push entirely.
     SKIP_PUSH=true
   fi
 else
   BODY="${LABEL} done — ${DIR}"
 fi
 
-# ── Push notification ─────────────────────────────────────────────────────
+# ── Push notification (debounced in --details mode) ────────────────────────
 if ! $SKIP_PUSH; then
-  curl -s \
-    -H "Priority: default" \
-    -H "Title: ${LABEL} done" \
-    -d "${BODY}" \
-    "ntfy.sh/${TOPIC}" \
-    > /dev/null 2>&1 &
+  if $DETAILS; then
+    # Trailing-edge debounce: only the last event in a burst fires.
+    # We touch a marker file, sleep, then check if we're still the newest.
+    # If a newer notify.sh ran during the sleep, it suppresses us.
+    touch "$MARKER_FILE"
+    (
+      sleep "$DEBOUNCE_SEC"
+      NEWEST=$(ls -t /tmp/push-notify-marker-* 2>/dev/null | head -1)
+      if [[ "$NEWEST" == "$MARKER_FILE" ]]; then
+        # We're the last turn in the burst — fire the notification
+        curl -s \
+          -H "Priority: default" \
+          -H "Title: ${LABEL} done" \
+          -d "${BODY}" \
+          "ntfy.sh/${TOPIC}" \
+          > /dev/null 2>&1
+      fi
+      rm -f "$MARKER_FILE"
+    ) &
+  else
+    # Non-details mode: fire immediately (backward compatible)
+    curl -s \
+      -H "Priority: default" \
+      -H "Title: ${LABEL} done" \
+      -d "${BODY}" \
+      "ntfy.sh/${TOPIC}" \
+      > /dev/null 2>&1 &
+  fi
 fi
 
 # ── Local sound ───────────────────────────────────────────────────────────
